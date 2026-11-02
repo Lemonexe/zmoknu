@@ -1857,6 +1857,7 @@ export default function App() {
                 details:
                   viewDay && dayHasData ? (
                     <DayDetailsMemo
+                      timezone={forecast.timezone}
                       day={viewDay}
                       air={air[viewDate] ?? null}
                       date={viewDate}

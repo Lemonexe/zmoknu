@@ -494,6 +494,8 @@ const EN: Record<string, string> = {
   "Slunce a Měsíc": "Sun & Moon",
   "Ovzduší a UV": "Air & UV",
   "Východ / západ": "Sunrise / sunset",
+  "Občanský soumrak": "Civil twilight",
+  "Ráno / večer": "Morning / evening",
   Prach: "Dust",
   "Délka dne": "Daylight length",
   "Východ / západ slunce": "Sunrise / sunset",

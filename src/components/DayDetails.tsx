@@ -12,6 +12,7 @@ import { skyQuality } from "../lib/skyEvents";
 import { fetchFlood, floodRisk, type FloodData } from "../lib/flood";
 import { clockTime, locDate } from "../lib/format";
 import { tr } from "../lib/i18n";
+import { solarEvents, solarClock } from "../lib/solarEvents";
 
 interface Props {
   day: DailyPoint;
@@ -20,6 +21,7 @@ interface Props {
   lat?: number;
   lon?: number;
   hourly?: HourlyPoint[];
+  timezone: string;
 }
 
 // Délka dne (h) pro daný den v roce a zeměpisnou šířku – čistě astronomicky,
@@ -148,12 +150,21 @@ export default function DayDetails({
   lat,
   lon,
   hourly,
+  timezone,
 }: Props) {
   const [open, setOpen] = useState(false);
   const uv = uvInfo(day.uvIndexMax);
   const aqi = air ? aqiLabel(air.aqi) : null;
   const pm = air ? pmLevel(air.pm25, air.pm10) : null;
   const moon = moonInfo(date);
+  const sun = useMemo(() => lat != null && lon != null
+    ? solarEvents(date, lat, lon, timezone) : null, [date, lat, lon, timezone]);
+  // Open-Meteo uses midnight placeholders for absent polar events. Preserve
+  // genuine midnight events when the astronomical crossing exists.
+  const riseMissing = !Number.isFinite(locDate(day.sunrise).getTime()) ||
+    (day.sunrise.endsWith("T00:00") && sun != null && sun.sunrise == null);
+  const setMissing = !Number.isFinite(locDate(day.sunset).getTime()) ||
+    (day.sunset.endsWith("T00:00") && sun != null && sun.sunset == null);
 
   // Riziko povodní (GloFAS) – načteme až při rozbalení detailů, ať zbytečně
   // netáhneme data. Výsledek je cachovaný podle polohy napříč dny.
@@ -183,6 +194,7 @@ export default function DayDetails({
   const goldenAmEnd = new Date(sunriseD.getTime() + goldenMin * 60_000);
   const goldenPmStart = new Date(sunsetD.getTime() - goldenMin * 60_000);
   const goldenOk =
+    !riseMissing && !setMissing &&
     Number.isFinite(sunriseD.getTime()) &&
     Number.isFinite(sunsetD.getTime()) &&
     goldenPmStart.getTime() > goldenAmEnd.getTime();
@@ -231,11 +243,17 @@ export default function DayDetails({
               label={tr("Východ / západ")}
               value={
                 <>
-                  {clockTime(sunriseD)}
+                  {riseMissing ? "—" : clockTime(sunriseD)}
                   <em className="dd-tile-sep"> / </em>
-                  {clockTime(sunsetD)}
+                  {setMissing ? "—" : clockTime(sunsetD)}
                 </>
               }
+            />
+            <Tile
+              icon="sunset"
+              label={tr("Občanský soumrak")}
+              value={<>{solarClock(sun?.dawn ?? null, timezone)}<em className="dd-tile-sep"> / </em>{solarClock(sun?.dusk ?? null, timezone)}</>}
+              note={tr("Ráno / večer")}
             />
             {lat != null && (
               <Tile
@@ -245,12 +263,6 @@ export default function DayDetails({
                 note={daylightTrend(lat, date)}
               />
             )}
-            <Tile
-              emoji={moon.emoji}
-              label={tr("Měsíc")}
-              value={tr(moon.name)}
-              note={tr("osvětlení {n} %", { n: moon.illum })}
-            />
             {goldenOk && (
               <Tile
                 icon="golden"
@@ -259,6 +271,12 @@ export default function DayDetails({
                 note={`${tr("večer")} ${clockTime(goldenPmStart)}–${clockTime(sunsetD)}`}
               />
             )}
+            <Tile
+              emoji={moon.emoji}
+              label={tr("Měsíc")}
+              value={tr(moon.name)}
+              note={tr("osvětlení {n} %", { n: moon.illum })}
+            />
             {sky?.sunset && (
               <Tile
                 icon="sunset"
